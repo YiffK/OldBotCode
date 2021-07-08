@@ -3,6 +3,7 @@ var _cfg_permission = require("./cfg_permission");
 var _cfg_role = require("./cfg_role");
 var _con_role_permission = require("./con_role_permission");
 var _posts = require("./posts");
+var _sources = require("./sources");
 var _usage_log = require("./usage_log");
 var _usr_role = require("./usr_role");
 var _usr_user = require("./usr_user");
@@ -12,6 +13,7 @@ function initModels(sequelize) {
   var cfg_role = _cfg_role(sequelize, DataTypes);
   var con_role_permission = _con_role_permission(sequelize, DataTypes);
   var posts = _posts(sequelize, DataTypes);
+  var sources = _sources(sequelize, DataTypes);
   var usage_log = _usage_log(sequelize, DataTypes);
   var usr_role = _usr_role(sequelize, DataTypes);
   var usr_user = _usr_user(sequelize, DataTypes);
@@ -32,6 +34,7 @@ function initModels(sequelize) {
     cfg_role,
     con_role_permission,
     posts,
+    sources,
     usage_log,
     usr_role,
     usr_user,

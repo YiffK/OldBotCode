@@ -1,24 +1,19 @@
 const Sequelize = require('sequelize');
 module.exports = function(sequelize, DataTypes) {
-  return sequelize.define('posts', {
+  return sequelize.define('sources', {
     id: {
       autoIncrement: true,
-      type: DataTypes.BIGINT.UNSIGNED,
+      type: DataTypes.TINYINT,
       allowNull: false,
       primaryKey: true
     },
-    source_id: {
-      type: DataTypes.TINYINT,
-      allowNull: false,
-      defaultValue: 1
-    },
-    submission_id: {
+    source_name: {
       type: DataTypes.STRING(20),
       allowNull: false
     }
   }, {
     sequelize,
-    tableName: 'posts',
+    tableName: 'sources',
     timestamps: false,
     indexes: [
       {

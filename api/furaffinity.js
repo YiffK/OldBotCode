@@ -1,7 +1,6 @@
-const { furaffinity } = require('./clients')
+const {furaffinity} = require('./clients')
 const ImageFetcher = require('./imageFetcher')
-const { sequelize } = require('../models/init-models')
-const { Posts } = require('../queries')
+const {Posts} = require('../queries')
 
 class Furaffinity extends ImageFetcher {
     extractSubstring() {
@@ -9,7 +8,14 @@ class Furaffinity extends ImageFetcher {
         let submissionId = subURL.substring(
             subURL.substring(1).indexOf('/') + 1,
         )
-        submissionId = submissionId.replaceAll('/', '')
+
+        try {
+            submissionId = submissionId.replaceAll('/', '')
+        } catch (error) {
+            while (submissionId.indexOf('/') !== -1) {
+                submissionId = submissionId.replace('/', '')
+            }
+        }
         return [subURL, submissionId]
     }
 
@@ -50,7 +56,7 @@ class Furaffinity extends ImageFetcher {
         } catch (error) {
             return {
                 success: false,
-                imgURL: error,
+                text: error.message ?? error
             }
         }
     }
