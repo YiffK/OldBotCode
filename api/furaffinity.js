@@ -1,13 +1,11 @@
-const {furaffinity} = require('./clients')
+const { furaffinity } = require('./clients')
 const ImageFetcher = require('./imageFetcher')
-const {Posts} = require('../queries')
+const { Posts } = require('../queries')
 
 class Furaffinity extends ImageFetcher {
     extractSubstring() {
         const subURL = this.url.substring(this.url.search('/view'))
-        let submissionId = subURL.substring(
-            subURL.substring(1).indexOf('/') + 1,
-        )
+        let submissionId = subURL.substring(subURL.substring(1).indexOf('/') + 1)
 
         try {
             submissionId = submissionId.replaceAll('/', '')
@@ -38,11 +36,14 @@ class Furaffinity extends ImageFetcher {
         try {
             const [subURL, submission_id] = this.extractSubstring()
             const repost = await Posts.findOneBySubmissionID(submission_id)
-            if (repost) {
-                throw new Error('This image has already been posted.')
+            if (repost) throw new Error('This image has already been posted.')
+            let post
+            try {
+                post = await Posts.createNew({ submission_id, source_id: 1 })
+            } catch (error) {
+                throw error
             }
-            const post = await Posts.createNew(submission_id)
-
+            if (!post) throw new Error('Error creating a post for this! Cookies might be invalid!')
             const result = await furaffinity.get(subURL, null, {
                 withCredentials: true,
             })
@@ -56,7 +57,7 @@ class Furaffinity extends ImageFetcher {
         } catch (error) {
             return {
                 success: false,
-                text: error.message ?? error
+                text: error.message ?? error,
             }
         }
     }
