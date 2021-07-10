@@ -77,6 +77,9 @@ bot.command('submit', async (ctx) => {
         ctx.reply('Only admins can post here!')
         return null
     }
+    let arr = ctx.update.message.text.split(' ')
+    arr.splice(0, 2)
+    const args = arr.join(' ')
 
     const [_, url] = ctx.update.message.text.split(' ')
     const context = getContext(url)
@@ -98,7 +101,7 @@ bot.command('submit', async (ctx) => {
     await ctx.telegram.sendPhoto(process.env.CHAT_AT, `${replacementURL ?? `https:${imgURL}`}`, {
         caption: `${ctx.message.text.split(' ')[1]}\n[${postID}]\n${
             process.env.CHAT_AT
-        }`,
+        }\n\n${args}`,
     })
     ctx.reply('Sent!')
 })
