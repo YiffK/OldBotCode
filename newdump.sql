@@ -14,14 +14,6 @@
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-SET @MYSQLDUMP_TEMP_LOG_BIN = @@SESSION.SQL_LOG_BIN;
-SET @@SESSION.SQL_LOG_BIN= 0;
-
---
--- GTID state at the beginning of the backup 
---
-
-SET @@GLOBAL.GTID_PURGED=/*!80000 '+'*/ '';
 
 --
 -- Table structure for table `cfg_permission`
@@ -35,7 +27,7 @@ CREATE TABLE `cfg_permission` (
   `name` varchar(30) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 ;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -60,7 +52,7 @@ CREATE TABLE `cfg_role` (
   `name` varchar(30) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 ;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -89,7 +81,7 @@ CREATE TABLE `con_role_permission` (
   KEY `permission_id` (`permission_id`),
   CONSTRAINT `con_role_permission_ibfk_1` FOREIGN KEY (`role_id`) REFERENCES `cfg_role` (`id`),
   CONSTRAINT `con_role_permission_ibfk_2` FOREIGN KEY (`permission_id`) REFERENCES `cfg_permission` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 ;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -114,7 +106,7 @@ CREATE TABLE `posts` (
   `submission_id` varchar(10) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `submission_id` (`submission_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=351 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=351 DEFAULT CHARSET=utf8mb4 ;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -138,7 +130,7 @@ CREATE TABLE `sources` (
   `id` tinyint NOT NULL AUTO_INCREMENT,
   `source_name` varchar(20) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 ;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -167,7 +159,7 @@ CREATE TABLE `usage_log` (
   PRIMARY KEY (`id`),
   KEY `user_internal_id` (`user_internal_id`),
   CONSTRAINT `usage_log_ibfk_1` FOREIGN KEY (`user_internal_id`) REFERENCES `usr_user` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=25 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=25 DEFAULT CHARSET=utf8mb4 ;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -194,7 +186,7 @@ CREATE TABLE `usr_role` (
   KEY `role_id` (`role_id`),
   CONSTRAINT `usr_role_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `usr_user` (`id`),
   CONSTRAINT `usr_role_ibfk_2` FOREIGN KEY (`role_id`) REFERENCES `cfg_role` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 ;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -221,7 +213,7 @@ CREATE TABLE `usr_user` (
   `create_date` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `current_username` (`current_username`)
-) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 ;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -233,7 +225,6 @@ LOCK TABLES `usr_user` WRITE;
 INSERT INTO `usr_user` VALUES (1,'1402476143','Yagdrassyl','2021-07-07 17:49:42'),(4,'657177532','FloofyCatto','2021-07-07 17:50:36'),(5,'700377699','TheHorsey','2021-07-07 20:13:27'),(7,'392105860','VinnieGoesCackle','2021-07-07 22:29:31'),(8,'760052860','mulipios_23','2021-07-07 23:20:09'),(9,'659118533','Ryndion','2021-07-07 23:41:02'),(11,'1090536985','whenthecitysleeps','2021-07-09 04:00:56'),(12,'660078140','raccoonvocalist','2021-07-09 04:02:27'),(13,'166843532','YaegerArts','2021-07-10 20:27:48'),(14,'468509838','NightstalkerTheWolfdragon','2021-07-10 21:25:20'),(15,'359205382','DigREEEEEE','2021-07-15 04:45:23');
 /*!40000 ALTER TABLE `usr_user` ENABLE KEYS */;
 UNLOCK TABLES;
-SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -244,4 +235,4 @@ SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2021-07-14 23:09:09
+-- Dump completed on 2021-07-14 23:27:41
