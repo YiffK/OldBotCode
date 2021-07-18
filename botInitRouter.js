@@ -94,6 +94,12 @@ bot.command('submit', async (ctx) => {
         ctx.reply(imgURL || 'Error')
         return null
     }
+    let currentTime 
+    {
+        const today = new Date()
+	currentTime = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()} ${today.getHours()}:${today.getMinutes()}:${today.getSeconds()}`
+    }
+    console.log('\x1b[32m', `[${currentTime}]New submit with url ${imgURL} submitted.`)
     await ctx.telegram.sendPhoto(process.env.CHAT_AT, `${hasHTTPS ? imgURL : `https:${imgURL}`}`, {
         caption: `${replacementURL ?? ctx.message.text.split(' ')[1]}\n[${postID}]\n${process.env.CHAT_AT}\n\n ${args ?? ''}`,
     })
