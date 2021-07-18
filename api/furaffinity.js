@@ -18,18 +18,15 @@ class Furaffinity extends ImageFetcher {
     }
 
     isolateURL(result) {
-        let urlContainer = ''
-        let beginning, end
-        end = result.data.search('Download')
-        if (!end) return null
+        let urlContainer = result.data.match(/<img id=\"submissionImg\".*\ src=(.*)>/gm)
+        if (urlContainer) urlContainer = urlContainer[0]
+        else throw 'Could not find image'
 
-        urlContainer = result.data.substring(0, end)
-        beginning = urlContainer.lastIndexOf('<')
-        urlContainer = urlContainer.substring(beginning)
-        beginning = urlContainer.indexOf('"') + 1
-        end = urlContainer.lastIndexOf('"')
-        urlContainer = urlContainer.substring(beginning, end)
-        return urlContainer
+        let [_, sub, extension] = urlContainer.match(/\ src\=\"(.*)\.(.*)\"/)
+        extension = extension.match(/(.*)\"\ /)[1]
+
+        if (!sub || !extension) throw 'Could not find image'
+        return `${sub}.${extension}`
     }
 
     async extractImageURL() {
