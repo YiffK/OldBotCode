@@ -13,8 +13,9 @@ module.exports = function(sequelize, DataTypes) {
       defaultValue: 1
     },
     submission_id: {
-      type: DataTypes.STRING(20),
-      allowNull: false
+      type: DataTypes.STRING(10),
+      allowNull: false,
+      unique: "submission_id"
     }
   }, {
     sequelize,
@@ -27,6 +28,14 @@ module.exports = function(sequelize, DataTypes) {
         using: "BTREE",
         fields: [
           { name: "id" },
+        ]
+      },
+      {
+        name: "submission_id",
+        unique: true,
+        using: "BTREE",
+        fields: [
+          { name: "submission_id" },
         ]
       },
     ]

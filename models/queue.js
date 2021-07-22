@@ -1,20 +1,23 @@
 const Sequelize = require('sequelize');
 module.exports = function(sequelize, DataTypes) {
-  return sequelize.define('cfg_permission', {
+  return sequelize.define('queue', {
     id: {
       autoIncrement: true,
-      type: DataTypes.TINYINT.UNSIGNED,
+      type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
       primaryKey: true
     },
-    name: {
-      type: DataTypes.STRING(30),
-      allowNull: true,
-      unique: "name"
+    imgURL: {
+      type: DataTypes.TEXT,
+      allowNull: false
+    },
+    obj: {
+      type: DataTypes.TEXT,
+      allowNull: false
     }
   }, {
     sequelize,
-    tableName: 'cfg_permission',
+    tableName: 'queue',
     timestamps: false,
     indexes: [
       {
@@ -26,11 +29,12 @@ module.exports = function(sequelize, DataTypes) {
         ]
       },
       {
-        name: "name",
+        name: "imgURL",
         unique: true,
-        using: "BTREE",
+        using: "HASH",
         fields: [
-          { name: "name" },
+          { name: "imgURL" },
+          { name: "obj" },
         ]
       },
     ]

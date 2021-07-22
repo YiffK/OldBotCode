@@ -5,6 +5,9 @@ const bot = new Telegraf('1758358884:AAE5S8wSSclTWbFli14wiVttUHNofK9As2o')
 const { sequelize } = require('./models/getModels')
 const { User } = require('./queries')
 const { Furaffinity, e621, Twitter } = require('./api')
+let universalCTXTelegram = null
+// 15 minutes in miliseconds
+let time = 900000
 
 function update_log(user_internal_id, command, success, commandArguments = null) {
     sequelize.models.usage_log.create({
@@ -59,7 +62,19 @@ function getContext(url) {
     else return null
 }
 
+bot.command('setTime', async (ctx) => {
+    let [_, newTime] = ctx.update.message.text.split(' ')
+    newTime = Number(newTime)
+    if (Number.isNaN(newTime)) {
+        ctx.reply('Invalid time!')
+        return null
+    }
+    time = newTime
+    ctx.reply('Time set to ' + time + 'ms')
+})
+
 bot.command('submit', async (ctx) => {
+    if (!universalCTXTelegram) universalCTXTelegram = ctx
     const { id: user_id } = await User.findOneByID(ctx.update.message.from.id)
     const userPermissions = await User.findUserRole(user_id)
 
@@ -94,16 +109,61 @@ bot.command('submit', async (ctx) => {
         ctx.reply(imgURL || 'Error')
         return null
     }
-    let currentTime 
+    let currentTime
     {
         const today = new Date()
-	currentTime = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()} ${today.getHours()}:${today.getMinutes()}:${today.getSeconds()}`
+        currentTime = `${today.getFullYear()}-${
+            today.getMonth() + 1
+        }-${today.getDate()} ${today.getHours()}:${today.getMinutes()}:${today.getSeconds()}`
     }
     console.log('\x1b[32m', `[${currentTime}]New submit with url ${imgURL} submitted.`)
-    await ctx.telegram.sendPhoto(process.env.CHAT_AT, `${hasHTTPS ? imgURL : `https:${imgURL}`}`, {
+    const finalUrl = `${hasHTTPS ? imgURL : `https:${imgURL}`}`
+    const accompanyingObj = JSON.stringify({
         caption: `${replacementURL ?? ctx.message.text.split(' ')[1]}\n[${postID}]\n${process.env.CHAT_AT}\n\n ${args ?? ''}`,
     })
-    ctx.reply('Sent!')
+
+    sequelize.models.queue.create({
+        imgURL: finalUrl,
+        obj: accompanyingObj,
+    })
+
+    // await ctx.telegram.sendPhoto(process.env.CHAT_AT, `${hasHTTPS ? imgURL : `https:${imgURL}`}`, {
+    //     caption: `${replacementURL ?? ctx.message.text.split(' ')[1]}\n[${postID}]\n${process.env.CHAT_AT}\n\n ${args ?? ''}`,
+    // })
+    ctx.reply('queued!')
+})
+
+function runQueue() {
+    sequelize.models.queue
+        .findOne({
+            limit: 1,
+        })
+        .then((queued) => {
+            if (!queued) {
+                console.log('\x1b[31m', '[ERROR] Nothing queued!')
+                setTimeout(() => runQueue(), time)
+                return null
+            }
+            if (!universalCTXTelegram) {
+                console.log('\x1b[31m', '[ERROR] UniversalCTXTelegram not set!')
+                setTimeout(() => runQueue(), time)
+                return null
+            }
+            const { imgURL, obj } = queued
+            const parsedObj = JSON.parse(obj)
+
+            universalCTXTelegram.telegram.sendPhoto(process.env.CHAT_AT, imgURL, parsedObj)
+            queued.destroy().then(() => {
+                console.log('\x1b[32m', '[SUCCESS] Queued item posted and deleted!')
+                setTimeout(() => runQueue(), time)
+            })
+        })
+}
+
+bot.command('startQueue', async (ctx) => {
+    if (!universalCTXTelegram) universalCTXTelegram = ctx
+    runQueue()
+    ctx.reply('Queue started!')
 })
 
 bot.start(async (ctx) => {
@@ -137,7 +197,8 @@ bot.start(async (ctx) => {
             })
         }
         // update_log(user.id, 'start', true, null)
-        ctx.reply(msg)
+        if (!universalCTXTelegram) universalCTXTelegram = ctx
+        universalCTXTelegram.reply(msg)
     } catch (error) {
         console.log(error)
         // update_log(user_id, 'start', false, error)
