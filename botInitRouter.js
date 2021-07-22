@@ -73,6 +73,76 @@ bot.command('setTime', async (ctx) => {
     ctx.reply('Time set to ' + time + 'ms')
 })
 
+bot.command('bulkSubmit', async (ctx) => {
+    if (!universalCTXTelegram) universalCTXTelegram = ctx
+    const { id: user_id } = await User.findOneByID(ctx.update.message.from.id)
+    const userPermissions = await User.findUserRole(user_id)
+
+    if (!userPermissions) {
+        ctx.reply('Only admins can post here!')
+        return null
+    }
+
+    if (userPermissions.role_id !== 1) {
+        ctx.reply('Only admins can post here!')
+        return null
+    }
+
+    let arr = ctx.update.message.text.split(' ')
+    arr.shift() // Delete the first command
+
+    let errors = 0
+    let success = 0
+    const addError = () => errors++
+    const addSuccess = () => success++
+
+    for (url of arr) {
+        await workURL(url, addError, addSuccess, ctx)
+    }
+
+    ctx.reply('Process finished!')
+})
+
+async function workURL(url, addError, addSuccess, ctx) {
+    try {
+        const context = getContext(url)
+        let worker
+        if (context) {
+            worker = new context(ctx, url)
+        } else {
+            addError()
+            return null
+        }
+        const { text: imgURL, success, postID, replacementURL, hasHTTPS } = await worker.extractImageURL()
+        if (!success) {
+            addError()
+            return null
+        }
+        let currentTime
+        {
+            const today = new Date()
+            currentTime = `${today.getFullYear()}-${
+                today.getMonth() + 1
+            }-${today.getDate()} ${today.getHours()}:${today.getMinutes()}:${today.getSeconds()}`
+        }
+        console.log('\x1b[32m', `[${currentTime}]New submit with url ${imgURL} submitted.`)
+        const finalUrl = `${hasHTTPS ? imgURL : `https:${imgURL}`}`
+        const accompanyingObj = JSON.stringify({
+            caption: `${replacementURL ?? ctx.message.text.split(' ')[1]}\n[${postID}]\n${process.env.CHAT_AT}\n\n ${args ?? ''}`,
+        })
+
+        await sequelize.models.queue.create({
+            imgURL: finalUrl,
+            obj: accompanyingObj,
+        })
+        addSuccess()
+        return true
+    } catch (error) {
+        addError()
+        return false
+    }
+}
+
 bot.command('submit', async (ctx) => {
     if (!universalCTXTelegram) universalCTXTelegram = ctx
     const { id: user_id } = await User.findOneByID(ctx.update.message.from.id)
@@ -130,7 +200,6 @@ bot.command('submit', async (ctx) => {
     // await ctx.telegram.sendPhoto(process.env.CHAT_AT, `${hasHTTPS ? imgURL : `https:${imgURL}`}`, {
     //     caption: `${replacementURL ?? ctx.message.text.split(' ')[1]}\n[${postID}]\n${process.env.CHAT_AT}\n\n ${args ?? ''}`,
     // })
-    ctx.reply('queued!')
 })
 
 function runQueue() {
