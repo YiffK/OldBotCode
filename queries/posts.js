@@ -1,12 +1,13 @@
 const sequelize = require('./sequelize')
 
-const findOneBySubmissionID = (submission_id) =>
-    sequelize.models.posts.findOne({where: {submission_id}})
+const transaction = () => sequelize.transaction()
 
-const createNew = (values) =>
-    sequelize.models.posts.create(values)
+const findOneBySubmissionID = (submission_id) => sequelize.models.posts.findOne({ where: { submission_id } })
+
+const createNew = (values, options) => sequelize.models.posts.create(values, options)
 
 module.exports = {
     findOneBySubmissionID,
     createNew,
+    transaction,
 }

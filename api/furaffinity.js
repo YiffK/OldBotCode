@@ -1,6 +1,6 @@
-const {furaffinity} = require('./clients')
+const { furaffinity } = require('./clients')
 const ImageFetcher = require('./imageFetcher')
-const {Posts} = require('../queries')
+const { Posts } = require('../queries')
 
 class Furaffinity extends ImageFetcher {
     extractSubstring() {
@@ -20,6 +20,15 @@ class Furaffinity extends ImageFetcher {
     }
 
     isolateURL(result) {
+        //     let urlContainer = result.data.match(/<img id=\"submissionImg\".*\ src=(.*)>/gm)
+        //     if (urlContainer) urlContainer = urlContainer[0]
+        //     else throw 'Could not find image'
+
+        //     let [_, sub, extension] = urlContainer.match(/\ src\=\"(.*)\.(.*)\"/)
+        //     extension = extension.match(/(.*)\"\ /)[1]
+
+        //     if (!sub || !extension) throw 'Could not find image'
+        //     return `${sub}.${extension}`
         let urlContainer = ''
         let beginning, end
         end = result.data.search('Download')
@@ -35,11 +44,19 @@ class Furaffinity extends ImageFetcher {
     }
 
     async extractImageURL() {
+        const t = await Posts.transaction()
         try {
             const [subURL, submission_id] = this.extractSubstring()
             const repost = await Posts.findOneBySubmissionID(submission_id)
-            if (repost) {
-                throw new Error('This image has already been posted.')
+            if (repost) throw new Error('This image has already been posted.')
+            let post
+            try {
+                post = await Posts.createNew(
+                    { submission_id, source_id: 1 },
+                    { transaction: t },
+                )
+            } catch (error) {
+                throw error
             }
             const post = await Posts.createNew(submission_id)
 
@@ -48,15 +65,17 @@ class Furaffinity extends ImageFetcher {
             })
 
             const urlContainer = this.isolateURL(result)
+            t.commit()
             return {
                 text: urlContainer,
                 success: true,
                 postID: post.id,
             }
         } catch (error) {
+            t.rollback()
             return {
                 success: false,
-                text: error.message ?? error
+                text: error.message ?? error,
             }
         }
     }

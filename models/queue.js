@@ -1,25 +1,23 @@
 const Sequelize = require('sequelize');
 module.exports = function(sequelize, DataTypes) {
-  return sequelize.define('posts', {
+  return sequelize.define('queue', {
     id: {
       autoIncrement: true,
-      type: DataTypes.BIGINT.UNSIGNED,
+      type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
       primaryKey: true
     },
-    source_id: {
-      type: DataTypes.TINYINT,
-      allowNull: false,
-      defaultValue: 1
+    imgURL: {
+      type: DataTypes.TEXT,
+      allowNull: false
     },
-    submission_id: {
-      type: DataTypes.STRING(10),
-      allowNull: false,
-      unique: "submission_id"
+    obj: {
+      type: DataTypes.TEXT,
+      allowNull: false
     }
   }, {
     sequelize,
-    tableName: 'posts',
+    tableName: 'queue',
     timestamps: false,
     indexes: [
       {
@@ -31,11 +29,12 @@ module.exports = function(sequelize, DataTypes) {
         ]
       },
       {
-        name: "submission_id",
+        name: "imgURL",
         unique: true,
-        using: "BTREE",
+        using: "HASH",
         fields: [
-          { name: "submission_id" },
+          { name: "imgURL" },
+          { name: "obj" },
         ]
       },
     ]
