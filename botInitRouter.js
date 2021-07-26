@@ -91,32 +91,33 @@ bot.command('bulkSubmit', async (ctx) => {
     let arr = ctx.update.message.text.split(' ')
     arr.shift() // Delete the first command
 
-    let errors = 0
-    let success = 0
-    const addError = () => errors++
-    const addSuccess = () => success++
+    let results = []
 
     for (url of arr) {
-        await workURL(url, addError, addSuccess, ctx)
+        results.push(await workURL(url, ctx))
     }
 
-    ctx.reply('Process finished!')
+    const success = results.filter((res) => res).length
+
+    ctx.reply(`Process finished with ${success} successes and ${results.length - success} errors`)
 })
 
-async function workURL(url, addError, addSuccess, ctx) {
+async function workURL(url, ctx) {
     try {
         const context = getContext(url)
         let worker
         if (context) {
             worker = new context(ctx, url)
         } else {
-            addError()
-            return null
+            return false
         }
-        const { text: imgURL, success, postID, replacementURL, hasHTTPS } = await worker.extractImageURL()
+        const { text: imgURL, success, hasHTTPS } = await worker.extractImageURL()
+        if (!imgURL) {
+            console.error('Error submitting ', url)
+            return false
+        }
         if (!success) {
-            addError()
-            return null
+            return false
         }
         let currentTime
         {
@@ -128,17 +129,16 @@ async function workURL(url, addError, addSuccess, ctx) {
         console.log('\x1b[32m', `[${currentTime}]New submit with url ${imgURL} submitted.`)
         const finalUrl = `${hasHTTPS ? imgURL : `https:${imgURL}`}`
         const accompanyingObj = JSON.stringify({
-            caption: `${replacementURL ?? ctx.message.text.split(' ')[1]}\n[${postID}]\n${process.env.CHAT_AT}\n\n ${args ?? ''}`,
+            caption: `${url}\n${process.env.CHAT_AT}`,
         })
 
         await sequelize.models.queue.create({
             imgURL: finalUrl,
             obj: accompanyingObj,
         })
-        addSuccess()
         return true
     } catch (error) {
-        addError()
+        console.log(error)
         return false
     }
 }
@@ -196,10 +196,78 @@ bot.command('submit', async (ctx) => {
         imgURL: finalUrl,
         obj: accompanyingObj,
     })
+    ctx.reply(`Submitted to queue`)
 
     // await ctx.telegram.sendPhoto(process.env.CHAT_AT, `${hasHTTPS ? imgURL : `https:${imgURL}`}`, {
     //     caption: `${replacementURL ?? ctx.message.text.split(' ')[1]}\n[${postID}]\n${process.env.CHAT_AT}\n\n ${args ?? ''}`,
     // })
+})
+
+async function getNumberInQueueModel(ctx) {
+    return new Promise((resolve, reject) => {
+        sequelize.models.queue
+            .count()
+            .then((res) => {
+                resolve(res)
+            })
+            .catch((err) => reject(err))
+    })
+}
+
+bot.command('count', async (ctx) => {
+    const numberInQueue = await getNumberInQueueModel(ctx)
+    ctx.reply(`There are ${numberInQueue} items in the queue`)
+})
+
+bot.command('submitNow', async (ctx) => {
+    if (!universalCTXTelegram) universalCTXTelegram = ctx
+    const { id: user_id } = await User.findOneByID(ctx.update.message.from.id)
+    const userPermissions = await User.findUserRole(user_id)
+
+    if (!userPermissions) {
+        ctx.reply('Only admins can post here!')
+        return null
+    }
+
+    if (userPermissions.role_id !== 1) {
+        ctx.reply('Only admins can post here!')
+        return null
+    }
+
+    let arr = ctx.update.message.text.split(' ')
+    arr.splice(0, 2)
+    const args = arr.join(' ')
+    const [_, url] = ctx.update.message.text.split(' ')
+    const context = getContext(url)
+    let worker
+    if (context) {
+        worker = new context(ctx, url)
+    } else {
+        ctx.reply(
+            'Error in link!\nOnly accepting:\n\t1. Furaffinity Views\n\t2. Twitter Posts with 1 image! (Works, but will always post the first image)'
+        )
+        return null
+    }
+
+    // Must send the entire URL and return an image URL
+    const { text: imgURL, success, postID, replacementURL, hasHTTPS } = await worker.extractImageURL()
+    if (!success) {
+        ctx.reply(imgURL || 'Error')
+        return null
+    }
+    let currentTime
+    {
+        const today = new Date()
+        currentTime = `${today.getFullYear()}-${
+            today.getMonth() + 1
+        }-${today.getDate()} ${today.getHours()}:${today.getMinutes()}:${today.getSeconds()}`
+    }
+    console.log('\x1b[32m', `[${currentTime}]New submit with url ${imgURL} submitted.`)
+
+    await ctx.telegram.sendPhoto(process.env.CHAT_AT, `${hasHTTPS ? imgURL : `https:${imgURL}`}`, {
+        caption: `${replacementURL ?? ctx.message.text.split(' ')[1]}\n[${postID}]\n${process.env.CHAT_AT}\n\n ${args ?? ''}`,
+    })
+    ctx.reply(`Sent!`)
 })
 
 function runQueue() {
