@@ -1,20 +1,20 @@
-const { furaffinity } = require('./clients')
-const ImageFetcher = require('./imageFetcher')
-const { Posts } = require('../queries')
+const { furaffinity } = require('./clients');
+const ImageFetcher = require('./imageFetcher');
+const { Posts } = require('../queries');
 
 class Furaffinity extends ImageFetcher {
     extractSubstring() {
-        const subURL = this.url.substring(this.url.search('/view'))
-        let submissionId = subURL.substring(subURL.substring(1).indexOf('/') + 1)
+        const subURL = this.url.substring(this.url.search('/view'));
+        let submissionId = subURL.substring(subURL.substring(1).indexOf('/') + 1);
 
         try {
-            submissionId = submissionId.replaceAll('/', '')
+            submissionId = submissionId.replaceAll('/', '');
         } catch (error) {
             while (submissionId.indexOf('/') !== -1) {
-                submissionId = submissionId.replace('/', '')
+                submissionId = submissionId.replace('/', '');
             }
         }
-        return [subURL, submissionId]
+        return [subURL, submissionId];
     }
 
     isolateURL(result) {
@@ -27,52 +27,54 @@ class Furaffinity extends ImageFetcher {
 
         //     if (!sub || !extension) throw 'Could not find image'
         //     return `${sub}.${extension}`
-        let urlContainer = ''
-        let beginning, end
-        end = result.data.search('Download')
-        if (!end) return null
+        let urlContainer = '';
+        let beginning, end;
+        end = result.data.search('Download');
+        if (!end) return null;
 
-        urlContainer = result.data.substring(0, end)
-        beginning = urlContainer.lastIndexOf('<')
-        urlContainer = urlContainer.substring(beginning)
-        beginning = urlContainer.indexOf('"') + 1
-        end = urlContainer.lastIndexOf('"')
-        urlContainer = urlContainer.substring(beginning, end)
-        return urlContainer
+        urlContainer = result.data.substring(0, end);
+        beginning = urlContainer.lastIndexOf('<');
+        urlContainer = urlContainer.substring(beginning);
+        beginning = urlContainer.indexOf('"') + 1;
+        end = urlContainer.lastIndexOf('"');
+        urlContainer = urlContainer.substring(beginning, end);
+        return urlContainer;
     }
 
     async extractImageURL() {
-        const t = await Posts.transaction()
+        const t = await Posts.transaction();
         try {
-            const [subURL, submission_id] = this.extractSubstring()
-            const repost = await Posts.findOneBySubmissionID(submission_id)
-            if (repost) throw new Error('This image has already been posted.')
-            let post
+            const [subURL, submission_id] = this.extractSubstring();
+            const repost = await Posts.findOneBySubmissionID(submission_id);
+            if (repost) throw new Error('This image has already been posted.');
+            let post;
             try {
-                post = await Posts.createNew({ submission_id, source_id: 1 }, { transaction: t })
+                post = await Posts.createNew({ submission_id, source_id: 1 }, { transaction: t });
             } catch (error) {
-                throw error
+                throw error;
             }
-            if (!post) throw new Error('Error creating a post for this! Cookies might be invalid!')
+            if (!post) throw new Error('Error creating a post for this! Cookies might be invalid!');
             const result = await furaffinity.get(subURL, null, {
                 withCredentials: true,
-            })
+            });
 
-            const urlContainer = this.isolateURL(result)
-            t.commit()
+            const urlContainer = 'https:' + this.isolateURL(result);
+            const isGif = urlContainer.substring(urlContainer.length - 3) === 'gif';
+            t.commit();
             return {
                 text: urlContainer,
                 success: true,
                 postID: post.id,
-            }
+                isGif,
+            };
         } catch (error) {
-            t.rollback()
+            t.rollback();
             return {
                 success: false,
                 text: error.message ?? error,
-            }
+            };
         }
     }
 }
 
-module.exports = Furaffinity
+module.exports = Furaffinity;

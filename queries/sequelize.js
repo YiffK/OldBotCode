@@ -1,3 +1,3 @@
-const { sequelize } = require('../models/getModels')
+const { sequelize } = require('../models');
 
-module.exports = sequelize
+module.exports = sequelize;
