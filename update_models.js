@@ -1,26 +1,16 @@
-var SequelizeAuto = require('sequelize-auto')
+var SequelizeAuto = require('sequelize-auto');
 // const newDatabase = require("./config/databaseConfig.json").newDatabase
+const { Sequelize } = require('sequelize');
+var database = require('./databaseconfig');
 
-var database = require( './databaseconfig')
+authenticationObject = database;
 
-authenticationObject = database
-var auto = new SequelizeAuto(
-    authenticationObject.database,
-    authenticationObject.username,
-    authenticationObject.password,
-    {
-        host: authenticationObject.host,
-        port: '3306',
-        dialect: authenticationObject.dialect,
-        additional: {
-            timestamps: false
-        }
-    }
-)
+var config = new Sequelize(database);
+const auto = new SequelizeAuto(config, null, null, {});
 
 auto.run(function (err) {
-    if (err) throw err
+    if (err) throw err;
 
     //   console.log(auto.tables);
     //   console.log(auto.foreignKeys);
-})
+});

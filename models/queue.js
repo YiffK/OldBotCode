@@ -3,40 +3,21 @@ module.exports = function(sequelize, DataTypes) {
   return sequelize.define('queue', {
     id: {
       autoIncrement: true,
-      type: DataTypes.INTEGER.UNSIGNED,
+      type: DataTypes.INTEGER,
       allowNull: false,
       primaryKey: true
     },
     imgURL: {
-      type: DataTypes.TEXT,
+      type: DataTypes.STRING(256),
       allowNull: false
     },
     obj: {
-      type: DataTypes.TEXT,
+      type: DataTypes.STRING(1024),
       allowNull: false
     }
   }, {
     sequelize,
     tableName: 'queue',
-    timestamps: false,
-    indexes: [
-      {
-        name: "PRIMARY",
-        unique: true,
-        using: "BTREE",
-        fields: [
-          { name: "id" },
-        ]
-      },
-      {
-        name: "imgURL",
-        unique: true,
-        using: "HASH",
-        fields: [
-          { name: "imgURL" },
-          { name: "obj" },
-        ]
-      },
-    ]
+    timestamps: false
   });
 };

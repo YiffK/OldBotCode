@@ -46,7 +46,11 @@ class Furaffinity extends ImageFetcher {
         try {
             const [subURL, submission_id] = this.extractSubstring();
             const repost = await Posts.findOneBySubmissionID(submission_id);
-            if (repost) throw new Error('This image has already been posted.');
+            if (repost) {
+                const currentTime = moment().utcOffset('-06:00').format('YYYY-MM-DD HH:mm:ss');
+                throw new Error(`[${currentTime}] This image has already been posted`);
+            }
+
             let post;
             try {
                 post = await Posts.createNew({ submission_id, source_id: 1 }, { transaction: t });

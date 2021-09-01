@@ -3,36 +3,17 @@ module.exports = function(sequelize, DataTypes) {
   return sequelize.define('cfg_role', {
     id: {
       autoIncrement: true,
-      type: DataTypes.TINYINT.UNSIGNED,
+      type: DataTypes.INTEGER,
       allowNull: false,
       primaryKey: true
     },
     name: {
-      type: DataTypes.STRING(30),
-      allowNull: true,
-      unique: "name"
+      type: DataTypes.STRING(100),
+      allowNull: false
     }
   }, {
     sequelize,
     tableName: 'cfg_role',
-    timestamps: false,
-    indexes: [
-      {
-        name: "PRIMARY",
-        unique: true,
-        using: "BTREE",
-        fields: [
-          { name: "id" },
-        ]
-      },
-      {
-        name: "name",
-        unique: true,
-        using: "BTREE",
-        fields: [
-          { name: "name" },
-        ]
-      },
-    ]
+    timestamps: false
   });
 };

@@ -36,10 +36,12 @@ class Twitter extends ImageFetcher {
                 isGif,
             };
         } catch (e) {
-            if (e.message === 'Validation error') e.message = 'This image has already been posted';
+            const currentTime = moment().utcOffset('-06:00').format('YYYY-MM-DD HH:mm:ss');
+
+            if (e.message === 'Validation error') e.message = `[${currentTime}] This image has already been posted`;
             return {
                 success: false,
-                text: e.message === 'Validation error' ? 'This image has already been posted' : e.message,
+                text: e.message === 'Validation error' ? `[${currentTime}] This image has already been posted` : e.message,
             };
         }
     }

@@ -3,52 +3,30 @@ module.exports = function(sequelize, DataTypes) {
   return sequelize.define('usr_user', {
     id: {
       autoIncrement: true,
-      type: DataTypes.BIGINT.UNSIGNED,
+      type: DataTypes.INTEGER,
       allowNull: false,
       primaryKey: true
     },
     role_id: {
-      type: DataTypes.TINYINT.UNSIGNED,
-      allowNull: false,
-      defaultValue: 2
+      type: DataTypes.INTEGER,
+      allowNull: false
     },
     user_id: {
-      type: DataTypes.STRING(30),
-      allowNull: false,
-      comment: "Store as string to save space"
+      type: DataTypes.STRING(50),
+      allowNull: false
     },
     current_username: {
-      type: DataTypes.STRING(50),
-      allowNull: true,
-      comment: "Must be updated accordingly",
-      unique: "current_username"
+      type: DataTypes.STRING(100),
+      allowNull: false
     },
     create_date: {
       type: DataTypes.DATE,
       allowNull: false,
-      defaultValue: Sequelize.Sequelize.fn('current_timestamp')
+      defaultValue: Sequelize.Sequelize.literal('CURRENT_TIMESTAMP')
     }
   }, {
     sequelize,
     tableName: 'usr_user',
-    timestamps: false,
-    indexes: [
-      {
-        name: "PRIMARY",
-        unique: true,
-        using: "BTREE",
-        fields: [
-          { name: "id" },
-        ]
-      },
-      {
-        name: "current_username",
-        unique: true,
-        using: "BTREE",
-        fields: [
-          { name: "current_username" },
-        ]
-      },
-    ]
+    timestamps: false
   });
 };

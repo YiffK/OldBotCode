@@ -5,9 +5,18 @@ const bot = new Telegraf('1758358884:AAE5S8wSSclTWbFli14wiVttUHNofK9As2o');
 const { sequelize } = require('./models');
 const { User } = require('./queries');
 const { Furaffinity, e621, Twitter } = require('./api');
-let universalCTXTelegram = null;
-// 15 minutes in miliseconds
-let time = 900000;
+const moment = require('moment');
+const cronjob = require('node-cron');
+// 5 minutes in miliseconds
+let time = 5 * 60 * 1000;
+
+const EventEmitter = require('events');
+const eventEmitter = new EventEmitter();
+
+eventEmitter.on('command', ({ user_internal_id, command }) => {
+    // sequelize.models.usage_log.create({
+    // })
+});
 
 function update_log(user_internal_id, command, success, commandArguments = null) {
     sequelize.models.usage_log.create({
@@ -22,7 +31,7 @@ async function extract(ctx, method, replyToUser = true) {
     if (ctx.chat.type !== 'private') return null;
     let user_id = -1;
     try {
-        const { username, id } = ctx.update.message.from;
+        const { id } = ctx.update.message.from;
         const user = await sequelize.models.usr_user.findOne({
             where: {
                 user_id: id.toString(),
@@ -53,12 +62,6 @@ async function extract(ctx, method, replyToUser = true) {
     }
 }
 
-bot.command('extract', async (ctx) => extract(ctx, 'extract'));
-
-bot.command('submitGif', async (ctx) => {
-    ctx.telegram.sendAnimation(ctx.update.message.from.id, 'pic.twitter.com/KUIaH93rp2');
-    ctx.reply('Sent');
-});
 function getContext(url) {
     if (url.match(/furaffinity\.net\/view\/[0-9]*(.*)$/)) return Furaffinity;
     else if (url.match(/e621\.net\/posts\/[0-9]*(.*)*$/)) return e621;
@@ -79,8 +82,8 @@ bot.command(['settime', 'setTime'], async (ctx) => {
 });
 
 bot.command(['bulksubmit', 'bulkSubmit'], async (ctx) => {
-    ctx.reply('Working...');
-    if (!universalCTXTelegram) universalCTXTelegram = ctx;
+    const batch = Date.now();
+    ctx.reply(`Working on batch ${batch}`);
     const { id: user_id } = await User.findOneByID(ctx.update.message.from.id);
     const userPermissions = await User.findUserRole(user_id);
 
@@ -96,17 +99,19 @@ bot.command(['bulksubmit', 'bulkSubmit'], async (ctx) => {
 
     let arr = ctx.update.message.text.split(' ');
     arr.shift(); // Delete the first command
+    const urls = [...new Set(arr[0].split('\n'))];
+    processUrls(urls, ctx, batch);
+});
 
-    let results = [];
-
+async function processUrls(arr, ctx, batch) {
+    const results = [];
     for (url of arr) {
         results.push(await workURL(url, ctx));
     }
 
     const success = results.filter((res) => res).length;
-
-    ctx.reply(`Process finished with ${success} successes and ${results.length - success} errors`);
-});
+    ctx.reply(`Batch ${batch} finished with ${success} successes and ${results.length - success} errors`);
+}
 
 async function workURL(url, ctx) {
     try {
@@ -117,7 +122,7 @@ async function workURL(url, ctx) {
         } else {
             return false;
         }
-        const { text: imgURL, success, postID, replacementURL, hasHTTPS, isGif } = await worker.extractImageURL();
+        const { text: imgURL, success, postID, replacementURL, hasHTTPS, isGif, type } = await worker.extractImageURL();
         if (!imgURL) {
             console.error('Error submitting ', url);
             return false;
@@ -125,17 +130,12 @@ async function workURL(url, ctx) {
         if (!success) {
             return false;
         }
-        let currentTime;
-        {
-            const today = new Date();
-            currentTime = `${today.getFullYear()}-${
-                today.getMonth() + 1
-            }-${today.getDate()} ${today.getHours()}:${today.getMinutes()}:${today.getSeconds()}`;
-        }
+        let currentTime = moment().utcOffset('-06:00').format('YYYY-MM-DD HH:mm:ss');
         console.log('\x1b[32m', `[${currentTime}]New submit with url ${imgURL} submitted.`);
         const finalUrl = `${hasHTTPS ? imgURL : `https:${imgURL}`}`;
         const finalObject = JSON.stringify({
             isGif,
+            type: type ?? null,
             accompanyingObj: {
                 caption: `[Source](${replacementURL || url})\n${process.env.CHAT_AT}`,
             },
@@ -153,7 +153,6 @@ async function workURL(url, ctx) {
 }
 
 bot.command('submit', async (ctx) => {
-    if (!universalCTXTelegram) universalCTXTelegram = ctx;
     const { id: user_id } = await User.findOneByID(ctx.update.message.from.id);
     const userPermissions = await User.findUserRole(user_id);
 
@@ -216,24 +215,21 @@ bot.command('submit', async (ctx) => {
     // })
 });
 
-async function getNumberInQueueModel(ctx) {
-    return new Promise((resolve, reject) => {
-        sequelize.models.queue
-            .count()
-            .then((res) => {
-                resolve(res);
-            })
-            .catch((err) => reject(err));
-    });
-}
+const getNumberInQueueModel = () => sequelize.models.queue.count();
 
 bot.command('count', async (ctx) => {
     const numberInQueue = await getNumberInQueueModel(ctx);
-    ctx.reply(`There are ${numberInQueue} items in the queue`);
+    const expectedMinutes = (numberInQueue * time) / 60 / 1000;
+    let expectedTimeOfRunOutPre = moment().add(expectedMinutes, 'minutes').utcOffset('-06:00');
+    let expectedTimeOfRunOut = expectedTimeOfRunOutPre.minute() % 5;
+    let finalExpectedTimeOfRunOut = moment()
+        .add(expectedMinutes + expectedTimeOfRunOut, 'minutes')
+        .utcOffset('-06:00')
+        .calendar();
+    ctx.reply(`There are ${numberInQueue} items in the queue. Expected to run until ${finalExpectedTimeOfRunOut}`);
 });
 
 bot.command('submitNow', async (ctx) => {
-    if (!universalCTXTelegram) universalCTXTelegram = ctx;
     const { id: user_id } = await User.findOneByID(ctx.update.message.from.id);
     const userPermissions = await User.findUserRole(user_id);
 
@@ -289,20 +285,20 @@ bot.command('submitNow', async (ctx) => {
     ctx.reply(`Sent!`);
 });
 
-function runQueue() {
+bot.command(['sendNow', 'sendnow'], (ctx) => {
+    runCronJob();
+    ctx.reply('Sent the next item in queue.');
+});
+
+function runCronJob() {
     sequelize.models.queue
         .findOne({
             limit: 1,
         })
         .then(async (queued) => {
+            const currentTime = moment().utcOffset('-06:00').format('YYYY-MM-DD HH:mm:ss');
             if (!queued) {
-                console.log('\x1b[31m', '[ERROR] Nothing queued!');
-                setTimeout(() => runQueue(), time);
-                return null;
-            }
-            if (!universalCTXTelegram) {
-                console.log('\x1b[31m', '[ERROR] UniversalCTXTelegram not set!');
-                setTimeout(() => runQueue(), time);
+                console.log('\x1b[31m', `[${currentTime}][ERROR] Nothing queued!`);
                 return null;
             }
             const { imgURL, obj } = queued;
@@ -310,77 +306,44 @@ function runQueue() {
             const finalUrl = `${imgURL.includes('https') ? imgURL : `https:${imgURL}`}`;
             let success = true;
             try {
-                if (!parsedObj.isGif) {
-                    await universalCTXTelegram.telegram.sendPhoto(process.env.CHAT_AT, finalUrl, {
-                        ...parsedObj.accompanyingObj,
-                        parse_mode: 'MarkdownV2',
-                    });
-                } else {
-                    await universalCTXTelegram.telegram.sendAnimation(process.env.CHAT_AT, finalUrl, {
-                        ...parsedObj.accompanyingObj,
-                        parse_mode: 'MarkdownV2',
-                    });
+                switch (parsedObj.type || null) {
+                    case 'webm':
+                        await bot.telegram.sendVideo(process.env.CHAT_AT, finalUrl, {
+                            ...parsedObj.accompanyingObj,
+                            parse_mode: 'MarkdownV2',
+                        });
+                        break;
+                    case 'gif':
+                        await bot.telegram.sendAnimation(process.env.CHAT_AT, finalUrl, {
+                            ...parsedObj.accompanyingObj,
+                            parse_mode: 'MarkdownV2',
+                        });
+                        break;
+                    default:
+                        await bot.telegram.sendPhoto(process.env.CHAT_AT, finalUrl, {
+                            ...parsedObj.accompanyingObj,
+                            parse_mode: 'MarkdownV2',
+                        });
+                        break;
                 }
             } catch (e) {
                 console.log(e);
                 success = false;
             }
             queued.destroy().then(() => {
+                const currentTime = moment().utcOffset('-06:00').format('YYYY-MM-DD HH:mm:ss');
                 if (!success) {
-                    console.error('[ERROR] Error in runQueue');
-                    runQueue();
+                    console.error(`[${currentTime}][ERROR] Error in runQueue`);
                 } else {
-                    console.log('\x1b[32m', '[SUCCESS] Queued item posted and deleted!');
-                    setTimeout(() => runQueue(), time);
+                    console.log('\x1b[32m', `[${currentTime}][SUCCESS] Queued item posted and deleted!`);
                 }
             });
         });
 }
 
-bot.command('extractNow', async (ctx) => {
-    const [_, url] = ctx.update.message.text.split(' ');
-    const context = getContext(url);
-    let worker;
-    if (context) {
-        worker = new context(ctx, url);
-    } else {
-        return false;
-    }
-    const { text: imgURL, success, hasHTTPS, isGif } = await worker.extractImageURL();
-    if (!imgURL) {
-        console.error('Error submitting ', url);
-        return false;
-    }
-    if (!success) {
-        ctx.reply(imgURL);
-        return false;
-    }
-    let currentTime;
-    {
-        const today = new Date();
-        currentTime = `${today.getFullYear()}-${
-            today.getMonth() + 1
-        }-${today.getDate()} ${today.getHours()}:${today.getMinutes()}:${today.getSeconds()}`;
-    }
-    console.log('\x1b[32m', `[${currentTime}]New submit with url ${imgURL} submitted.`);
-    const finalUrl = `${hasHTTPS ? imgURL : `https:${imgURL}`}`;
-    if (!isGif) {
-        ctx.telegram.sendPhoto(ctx.update.message.chat.id, finalUrl);
-    } else {
-        ctx.telegram.sendAnimation(ctx.update.message.chat.id, finalUrl);
-    }
-});
-
-bot.command(['startQueue', 'startqueue'], async (ctx) => {
-    if (!universalCTXTelegram) universalCTXTelegram = ctx;
-    const numberInQueue = await getNumberInQueueModel(ctx);
-    // Subtime variable with 15 minutes in ms
-    runQueue();
-    ctx.reply('Queue started!');
-});
+cronjob.schedule(`*/${time / 60 / 1000} * * * *`, runCronJob);
 
 bot.start(async (ctx) => {
-    let user_id = -1;
     try {
         const { username, id } = ctx.update.message.from;
         user_id = id;
@@ -407,11 +370,11 @@ bot.start(async (ctx) => {
             user = await sequelize.models.usr_user.create({
                 current_username,
                 user_id,
+                create_date: Date.now(),
             });
         }
         // update_log(user.id, 'start', true, null)
-        if (!universalCTXTelegram) universalCTXTelegram = ctx;
-        universalCTXTelegram.reply(msg);
+        ctx.reply(msg);
     } catch (error) {
         console.log(error);
         // update_log(user_id, 'start', false, error)

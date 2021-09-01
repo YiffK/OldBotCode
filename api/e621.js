@@ -1,8 +1,7 @@
-const { sequelize } = require('../models/init-models');
 const { e621: client } = require('./clients');
-const htmlToJson = require('html-to-json');
 const ImageFetcher = require('./imageFetcher');
 const { Posts } = require('../queries');
+const moment = require('moment');
 
 class e621 extends ImageFetcher {
     extractSubstring() {
@@ -35,15 +34,21 @@ class e621 extends ImageFetcher {
         try {
             const submission_id = this.extractSubstring();
             const repost = await Posts.findOneBySubmissionID(submission_id);
-            if (repost) throw new Error('This image has already been posted');
+            if (repost) {
+                const currentTime = moment().utcOffset('-06:00').format('YYYY-MM-DD HH:mm:ss');
+                throw new Error(`[${currentTime}] This image has already been posted`);
+            }
 
-            const post = await Posts.createNew({ submission_id, source_id: 2 }, { transaction: t });
+            const created_at = moment().utcOffset('-06:00').format('YYYY-MM-DD hh:mm:ss');
+            const post = await Posts.createNew({ submission_id, source_id: 2, created_at }, { transaction: t });
 
             if (!post) throw new Error('Error creating post');
             const petition = `${submission_id}.json`;
             const result = await client.get(petition);
-            const text = result.data.post.file.url;
-            const { sources } = result.data.post;
+            const {
+                sources,
+                file: { url: text, ext: type },
+            } = result.data.post;
             // Prefer Twitter over Furaffinity Over
             let replacementURL = sources.length ? this.findURL(sources) : this.url;
             t.commit();
@@ -53,14 +58,16 @@ class e621 extends ImageFetcher {
                 postID: post.id,
                 isGif: false,
                 replacementURL,
+                type,
             };
         } catch (e) {
             if (e.message === 'Validation error') e.message = `${this.url} has already been posted`;
             console.log(e.message || e);
             t.rollback();
+            const currentTime = moment().utcOffset('-06:00').format('YYYY-MM-DD HH:mm:ss');
             return {
                 success: false,
-                text: e.message === 'Validation error' ? 'This image has already been posted' : e.message,
+                text: e.message === 'Validation error' ? `[${currentTime}] This image has already been posted` : e.message,
             };
         }
     }

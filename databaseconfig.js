@@ -1,13 +1,8 @@
 const modes = {
     development: {
-        username: 'root',
-        password: '',
-
-        database: 'yiffycornerbot',
-        host: '127.0.0.1',
-        dialect: 'mysql',
+        dialect: 'sqlite',
+        storage: './db.sqlite',
         logging: false,
-        port: 3306,
     },
     test: {
         username: 'root',
@@ -27,8 +22,8 @@ const modes = {
         logging: false,
         port: 3306,
     },
-}
+};
 
-const currentMode = 'development'
+const currentMode = 'development';
 
-module.exports = modes[currentMode]
+module.exports = modes[currentMode];
