@@ -153,8 +153,13 @@ async function workURL(url, ctx) {
 }
 
 bot.command('submit', async (ctx) => {
-    const { id: user_id } = await User.findOneByID(ctx.update.message.from.id);
-    const userPermissions = await User.findUserRole(user_id);
+    try {
+        const { id: user_id } = await User.findOneByID(ctx.update.message.from.id);
+        const userPermissions = await User.findUserRole(user_id);
+    } catch (err) {
+        ctx.reply('Sorry, I am programmed to only reply to one person at the moment');
+        return null;
+    }
 
     if (!userPermissions) {
         ctx.reply('Only admins can post here!');
@@ -220,13 +225,69 @@ const getNumberInQueueModel = () => sequelize.models.queue.count();
 bot.command('count', async (ctx) => {
     const numberInQueue = await getNumberInQueueModel(ctx);
     const expectedMinutes = (numberInQueue * time) / 60 / 1000;
-    let expectedTimeOfRunOutPre = moment().add(expectedMinutes, 'minutes').utcOffset('-06:00');
-    let expectedTimeOfRunOut = expectedTimeOfRunOutPre.minute() % 5;
-    let finalExpectedTimeOfRunOut = moment()
-        .add(expectedMinutes + expectedTimeOfRunOut, 'minutes')
+    const minutesSinceLastPost = moment().minutes() % 5;
+    let expectedTimeOfRunOutPre = moment()
+        .add(expectedMinutes - minutesSinceLastPost, 'minutes')
         .utcOffset('-06:00')
-        .calendar();
-    ctx.reply(`There are ${numberInQueue} items in the queue. Expected to run until ${finalExpectedTimeOfRunOut}`);
+        .format('llll');
+    ctx.reply(`There are ${numberInQueue} items in the queue. Expected to run until nearing ${expectedTimeOfRunOutPre}`);
+});
+
+bot.command(['forceSubmitNow', 'forcesubmitnow'], async (ctx) => {
+    const { id: user_id } = await User.findOneByID(ctx.update.message.from.id);
+    const userPermissions = await User.findUserRole(user_id);
+
+    if (!userPermissions) {
+        ctx.reply('Only admins can post here!');
+        return null;
+    }
+
+    if (userPermissions.role_id !== 1) {
+        ctx.reply('Only admins can post here!');
+        return null;
+    }
+    let arr = ctx.update.message.text.split(' ');
+    arr.splice(0, 2);
+    const args = arr.join(' ');
+    const [_, url] = ctx.update.message.text.split(' ');
+    const context = getContext(url);
+    let worker;
+    if (context) {
+        worker = new context(ctx, url, true);
+    } else {
+        ctx.reply(
+            'Error in link!\nOnly accepting:\n\t1. Furaffinity Views\n\t2. Twitter Posts with 1 image! (Works, but will always post the first image)'
+        );
+        return null;
+    }
+
+    // Must send the entire URL and return an image URL
+    const { text: imgURL, success, postID, replacementURL, hasHTTPS = true, isGif } = await worker.extractImageURL(true);
+    if (!success) {
+        ctx.reply(imgURL || 'Error');
+        return null;
+    }
+    let currentTime;
+    {
+        const today = new Date();
+        currentTime = `${today.getFullYear()}-${
+            today.getMonth() + 1
+        }-${today.getDate()} ${today.getHours()}:${today.getMinutes()}:${today.getSeconds()}`;
+    }
+    console.log('\x1b[32m', `[${currentTime}]New submit with url ${imgURL} submitted.`);
+
+    if (!isGif) {
+        await ctx.telegram.sendPhoto(process.env.CHAT_AT, `${hasHTTPS ? imgURL : `https:${imgURL}`}`, {
+            caption: `[Source](${replacementURL || url})\n${process.env.CHAT_AT}`,
+            parse_mode: 'MarkdownV2',
+        });
+    } else {
+        await ctx.telegram.sendAnimation(process.env.CHAT_AT, `${hasHTTPS ? imgURL : `https:${imgURL}`}`, {
+            caption: `[Source](${replacementURL || url})\n${process.env.CHAT_AT}`,
+            parse_mode: 'MarkdownV2',
+        });
+    }
+    ctx.reply(`Sent!`);
 });
 
 bot.command('submitNow', async (ctx) => {
@@ -275,11 +336,11 @@ bot.command('submitNow', async (ctx) => {
 
     if (!isGif) {
         await ctx.telegram.sendPhoto(process.env.CHAT_AT, `${hasHTTPS ? imgURL : `https:${imgURL}`}`, {
-            caption: `${replacementURL ?? ctx.message.text.split(' ')[1]}\n[${postID}]\n${process.env.CHAT_AT}\n\n ${args ?? ''}`,
+            caption: `[Source](${replacementURL || url})\n${process.env.CHAT_AT}`,
         });
     } else {
         await ctx.telegram.sendAnimation(process.env.CHAT_AT, `${hasHTTPS ? imgURL : `https:${imgURL}`}`, {
-            caption: `${replacementURL ?? ctx.message.text.split(' ')[1]}\n[${postID}]\n${process.env.CHAT_AT}\n\n ${args ?? ''}\n#Gif`,
+            caption: `[Source](${replacementURL || url})\n${process.env.CHAT_AT}`,
         });
     }
     ctx.reply(`Sent!`);
@@ -327,21 +388,19 @@ function runCronJob() {
                         break;
                 }
             } catch (e) {
-                console.log(e);
+                console.log(`[${currentTime}] ${e?.response?.description ?? e}`);
                 success = false;
             }
             queued.destroy().then(() => {
-                const currentTime = moment().utcOffset('-06:00').format('YYYY-MM-DD HH:mm:ss');
                 if (!success) {
                     console.error(`[${currentTime}][ERROR] Error in runQueue`);
+                    runCronJob();
                 } else {
                     console.log('\x1b[32m', `[${currentTime}][SUCCESS] Queued item posted and deleted!`);
                 }
             });
         });
 }
-
-cronjob.schedule(`*/${time / 60 / 1000} * * * *`, runCronJob);
 
 bot.start(async (ctx) => {
     try {
@@ -381,4 +440,5 @@ bot.start(async (ctx) => {
     }
 });
 
+cronjob.schedule(`*/${time / 60 / 1000} * * * *`, runCronJob);
 bot.launch();

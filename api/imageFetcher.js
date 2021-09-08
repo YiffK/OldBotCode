@@ -1,16 +1,16 @@
 class ImageFetcher {
     constructor(ctx, url) {
-        this.ctx = ctx
-        this.url = url
+        this.ctx = ctx;
+        this.url = url;
     }
 
     extractSubstring() {
-        return null
+        return null;
     }
 
     extractImageURL() {
-        return null
+        return null;
     }
 }
 
-module.exports = ImageFetcher
+module.exports = ImageFetcher;

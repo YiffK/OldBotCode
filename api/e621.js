@@ -29,20 +29,22 @@ class e621 extends ImageFetcher {
         return sources[0];
     }
 
-    async extractImageURL() {
-        const t = await Posts.transaction();
+    async extractImageURL(forceIfRepost = false) {
+        let t;
+        if (!forceIfRepost) t = await Posts.transaction();
         try {
             const submission_id = this.extractSubstring();
-            const repost = await Posts.findOneBySubmissionID(submission_id);
-            if (repost) {
-                const currentTime = moment().utcOffset('-06:00').format('YYYY-MM-DD HH:mm:ss');
-                throw new Error(`[${currentTime}] This image has already been posted`);
+            if (!forceIfRepost) {
+                const repost = await Posts.findOneBySubmissionID(submission_id);
+                if (repost) {
+                    const currentTime = moment().utcOffset('-06:00').format('YYYY-MM-DD HH:mm:ss');
+                    throw new Error(`[${currentTime}] This image has already been posted`);
+                }
+                const created_at = moment().utcOffset('-06:00').format('YYYY-MM-DD hh:mm:ss');
+                const post = await Posts.createNew({ submission_id, source_id: 2, created_at }, { transaction: t });
+                if (!post) throw new Error('Error creating post');
             }
 
-            const created_at = moment().utcOffset('-06:00').format('YYYY-MM-DD hh:mm:ss');
-            const post = await Posts.createNew({ submission_id, source_id: 2, created_at }, { transaction: t });
-
-            if (!post) throw new Error('Error creating post');
             const petition = `${submission_id}.json`;
             const result = await client.get(petition);
             const {
@@ -51,11 +53,10 @@ class e621 extends ImageFetcher {
             } = result.data.post;
             // Prefer Twitter over Furaffinity Over
             let replacementURL = sources.length ? this.findURL(sources) : this.url;
-            t.commit();
+            if (!forceIfRepost) t.commit();
             return {
                 text,
                 success: true,
-                postID: post.id,
                 isGif: false,
                 replacementURL,
                 type,
@@ -63,7 +64,7 @@ class e621 extends ImageFetcher {
         } catch (e) {
             if (e.message === 'Validation error') e.message = `${this.url} has already been posted`;
             console.log(e.message || e);
-            t.rollback();
+            if (!forceIfRepost) t.rollback();
             const currentTime = moment().utcOffset('-06:00').format('YYYY-MM-DD HH:mm:ss');
             return {
                 success: false,
