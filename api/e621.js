@@ -29,7 +29,7 @@ class e621 extends ImageFetcher {
         return sources[0];
     }
 
-    async extractImageURL(forceIfRepost = true) {
+    async extractImageURL(forceIfRepost = false) {
         let t;
         if (!forceIfRepost) t = await Posts.transaction();
         try {
