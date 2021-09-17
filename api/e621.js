@@ -29,7 +29,7 @@ class e621 extends ImageFetcher {
         return sources[0];
     }
 
-    async extractImageURL(forceIfRepost = false) {
+    async extractImageURL(forceIfRepost = true) {
         let t;
         if (!forceIfRepost) t = await Posts.transaction();
         try {
@@ -47,12 +47,18 @@ class e621 extends ImageFetcher {
 
             const petition = `${submission_id}.json`;
             const result = await client.get(petition);
-            const {
-                sources,
-                file: { url: text, ext: type },
-            } = result.data.post;
+            let sources = undefined;
+            let text = undefined;
+            let type = undefined;
+
+            if (result.data?.post) {
+                sources = result.data.post;
+                text = result.data.post.file;
+                type = result.data.post.file;
+            }
             // Prefer Twitter over Furaffinity Over
-            let replacementURL = sources.length ? this.findURL(sources) : this.url;
+            let replacementURL = sources?.length ? this.findURL(sources) : this.url;
+            if (!text) text = replacementURL;
             if (!forceIfRepost) t.commit();
             return {
                 text,

@@ -308,6 +308,10 @@ bot.command('submitNow', async (ctx) => {
     arr.splice(0, 2);
     const args = arr.join(' ');
     const [_, url] = ctx.update.message.text.split(' ');
+    if (!url) {
+        ctx.reply('No arguments!');
+        return;
+    }
     const context = getContext(url);
     let worker;
     if (context) {

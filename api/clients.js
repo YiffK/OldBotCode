@@ -13,7 +13,7 @@ const e621 = create({
     baseURL: 'https://e621.net/posts/',
     headers: {
         Cookie: 'gw=seen',
-        'User-Agent': 'YiffyCornerTelegramBot',
+        'User-Agent': 'YiffyCornerBot',
     },
 });
 // Regex to extract twitter API /\/tweets\/[0-9]*/gm
