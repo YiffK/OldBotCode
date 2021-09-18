@@ -52,9 +52,9 @@ class e621 extends ImageFetcher {
             let type = undefined;
 
             if (result.data?.post) {
-                sources = result.data.post;
-                text = result.data.post.file;
-                type = result.data.post.file;
+                sources = result.data.post.sources;
+                text = result.data.post.file.url;
+                type = result.data.post.file.ext;
             }
             // Prefer Twitter over Furaffinity Over
             let replacementURL = sources?.length ? this.findURL(sources) : this.url;
