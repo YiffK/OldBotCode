@@ -81,6 +81,21 @@ bot.command(['settime', 'setTime'], async (ctx) => {
     ctx.reply('Time set to ' + time + 'ms (' + newTime + ' mins)');
 });
 
+bot.command(['addadmin', 'addAdmin'], async (ctx) => {
+    const [_, username] = ctx.update.message.text.split(' ');
+
+    // First, find the user in the database
+    const user = await User.findUserByUsername(username);
+    if (!user) return ctx.reply('User not found');
+    const user_id = user.id;
+    const userTuple = await User.findUserRole(user_id);
+    if (!userTuple) {
+        User.createNew();
+    } else {
+    }
+});
+bot.command(['removeadmin', 'removeAdmin'], async (ctx) => {});
+
 bot.command(['bulksubmit', 'bulkSubmit'], async (ctx) => {
     const batch = Date.now();
     ctx.reply(`Working on batch ${batch}`);
@@ -434,6 +449,11 @@ bot.start(async (ctx) => {
                 current_username,
                 user_id,
                 create_date: Date.now(),
+            });
+
+            userTuple = await sequelize.models.usr_role.create({
+                user_id: user.user_id,
+                role_id: 2,
             });
         }
         // update_log(user.id, 'start', true, null)
