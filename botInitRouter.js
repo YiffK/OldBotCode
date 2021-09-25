@@ -11,6 +11,7 @@ const cronjob = require('node-cron');
 let time = 5 * 60 * 1000;
 
 const EventEmitter = require('events');
+const { transaction } = require('./queries/posts');
 const eventEmitter = new EventEmitter();
 
 eventEmitter.on('command', ({ user_internal_id, command }) => {
@@ -81,51 +82,83 @@ bot.command(['settime', 'setTime'], async (ctx) => {
     ctx.reply('Time set to ' + time + 'ms (' + newTime + ' mins)');
 });
 
-bot.command(['addadmin', 'addAdmin'], async (ctx) => {
-    const [_, username] = ctx.update.message.text.split(' ');
+async function adminOperations(ctx, role) {
+    let [_, username] = ctx.update.message.text.split(' ');
+    let requester = ctx.update.message.from.username;
+    const requesterUser = await User.findUserByUsername(requester);
+    const requesterTuple = await User.findUserRole(requesterUser.id);
+    if (requesterTuple?.role_id !== 1) return ctx.reply('You are not authorized to use this command!');
+    if (username[0] === '@') username = username.slice(1);
+    if (requesterUser.current_username === username) return ctx.reply('You cannot use this command on yourself!');
 
     // First, find the user in the database
     const user = await User.findUserByUsername(username);
     if (!user) return ctx.reply('User not found');
+
     const user_id = user.id;
-    const userTuple = await User.findUserRole(user_id);
+    let userTuple = await User.findUserRole(user_id);
+
     if (!userTuple) {
-        User.createNew();
+        await User.createUserRole(user.id, role);
+        return ctx.reply('User role created as admin');
     } else {
+        if (userTuple.role_id === role) {
+            return ctx.reply('User already has this role');
+        }
+        await userTuple.destroy();
+        await User.createUserRole(user.id, role);
+        return ctx.reply('User role updated to admin');
     }
-});
-bot.command(['removeadmin', 'removeAdmin'], async (ctx) => {});
+}
 
+bot.command(['addadmin', 'addAdmin'], async (ctx) => adminOperations(ctx, 1));
+bot.command(['removeadmin', 'removeAdmin'], async (ctx) => adminOperations(ctx, 2));
+
+bot.command('setOwnerChatId', async (ctx) => {
+    const { current_username } = await User.findOneByID(ctx.update.message.from.id);
+    if (current_username !== 'Yagdrassyl') return ctx.reply('You are not authorized to use this command!');
+    ownerChatId = ctx.chat.id;
+    ctx.reply('Owner chat id set to ' + ownerChatId);
+});
+
+let ownerChatId = 1402476143;
 bot.command(['bulksubmit', 'bulkSubmit'], async (ctx) => {
-    const batch = Date.now();
-    ctx.reply(`Working on batch ${batch}`);
-    const { id: user_id } = await User.findOneByID(ctx.update.message.from.id);
-    const userPermissions = await User.findUserRole(user_id);
+    try {
+        const batch = Date.now();
+        ctx.reply(`Working on batch ${batch}`);
+        const { id: user_id } = await User.findOneByID(ctx.update.message.from.id);
+        const userPermissions = await User.findUserRole(user_id);
 
-    if (!userPermissions) {
-        ctx.reply('Only admins can post here!');
-        return null;
+        if (!userPermissions) return ctx.reply('Only admins can post here!');
+
+        if (userPermissions.role_id !== 1) return ctx.reply('Only admins can post here!');
+        ctx.telegram.sendMessage(ownerChatId, `Bulk submit started by ${ctx.chat.first_name} | ${ctx.chat.username}`);
+
+        let arr = ctx.update.message.text.split(' ');
+        arr.shift(); // Delete the first command
+        if (!arr) return ctx.reply('No urls found!');
+        let urls = [...new Set(arr[0].split('\n'))];
+        if (!urls) return ctx.reply('No urls found!');
+        urls = urls.filter((url) => !!url);
+        await processUrls(urls, ctx, batch);
+    } catch (error) {
+        ctx.telegram.sendMessage(ownerChatId, `Bulk submit failed by ${ctx.chat.first_name} | ${ctx.chat.username}`);
+        ctx.telegram.sendMessage(ownerChatId, JSON.stringify(error));
+        ctx.reply('There was an error while bulk submitting your posts');
     }
-
-    if (userPermissions.role_id !== 1) {
-        ctx.reply('Only admins can post here!');
-        return null;
-    }
-
-    let arr = ctx.update.message.text.split(' ');
-    arr.shift(); // Delete the first command
-    const urls = [...new Set(arr[0].split('\n'))];
-    processUrls(urls, ctx, batch);
 });
 
-async function processUrls(arr, ctx, batch) {
-    const results = [];
-    for (url of arr) {
-        results.push(await workURL(url, ctx));
-    }
+function processUrls(arr, ctx, batch) {
+    return new Promise(async (resolve, reject) => {
+        const results = [];
+        for (url of arr) {
+            results.push(await workURL(url, ctx));
+        }
 
-    const success = results.filter((res) => res).length;
-    ctx.reply(`Batch ${batch} finished with ${success} successes and ${results.length - success} errors`);
+        const success = results.filter((res) => res).length;
+        ctx.reply(`Batch ${batch} finished with ${success} successes and ${results.length - success} errors`);
+        resolve(true);
+    });
 }
 
 async function workURL(url, ctx) {
@@ -149,6 +182,7 @@ async function workURL(url, ctx) {
         console.log('\x1b[32m', `[${currentTime}]New submit with url ${imgURL} submitted.`);
         const finalUrl = `${hasHTTPS ? imgURL : `https:${imgURL}`}`;
         const finalObject = JSON.stringify({
+            poster: ctx.chat.username || ctx.update.message.from.username,
             isGif,
             type: type ?? null,
             accompanyingObj: {
@@ -433,28 +467,38 @@ bot.start(async (ctx) => {
         });
         if (user) {
             msg =
-                `Welcome back @${username}!\n` +
+                `Welcome back @${username} !\n` +
                 'What would you like to do today?\n' +
-                '/extract [LINK] - Extracts a picture with a furaffinity link\n' +
-                '/submit [LINK] - Extracts a picture from the URL and sends it to the channel';
+                'Remember that you need admin priviledges to use me!';
         } else {
             msg =
-                `Welcome @${username}!\n` +
+                `Welcome @${username} !\n` +
                 `I am a bot created to help managing ${process.env.CHAT_AT} !\n` +
-                'You can use the following commands to gimme some orders:\n' +
-                '/extract - Extracts a picture with a furaffinity link\n' +
-                '/submit [LINK] [ANY COMMENT, CAN BE NOTHING] - Sends a pic to the channel :3';
+                'You need admin priviledges to use me!';
             const { username: current_username, id: user_id } = ctx.update.message.from;
-            user = await sequelize.models.usr_user.create({
-                current_username,
-                user_id,
-                create_date: Date.now(),
-            });
+            const transaction = await sequelize.transaction();
+            try {
+                user = await sequelize.models.usr_user.create(
+                    {
+                        role_id: 2,
+                        current_username,
+                        user_id,
+                        create_date: Date.now(),
+                    },
+                    { transaction }
+                );
 
-            userTuple = await sequelize.models.usr_role.create({
-                user_id: user.user_id,
-                role_id: 2,
-            });
+                const userTuple = await sequelize.models.usr_role.create(
+                    {
+                        user_id: user.id,
+                        role_id: 2,
+                    },
+                    { transaction }
+                );
+                await transaction.commit();
+            } catch {
+                await transaction.rollback();
+            }
         }
         // update_log(user.id, 'start', true, null)
         ctx.reply(msg);
