@@ -202,6 +202,7 @@ async function workURL(url, ctx) {
 }
 
 bot.command('submit', async (ctx) => {
+    return ctx.reply('This command is deprecated. Please use /bulkSubmit instead');
     try {
         const { id: user_id } = await User.findOneByID(ctx.update.message.from.id);
         const userPermissions = await User.findUserRole(user_id);
