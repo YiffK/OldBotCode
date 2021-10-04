@@ -148,7 +148,6 @@ async function workURL(url) {
         console.log('\x1b[32m', `[${currentTime}]New submit with url ${imgURL} submitted.`);
         const finalUrl = `${hasHTTPS ? imgURL : `https:${imgURL}`}`;
         const finalObject = JSON.stringify({
-            poster: ctx.chat.username || ctx.update.message.from.username,
             isGif,
             type: type ?? null,
             accompanyingObj: {
