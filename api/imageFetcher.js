@@ -1,6 +1,5 @@
 class ImageFetcher {
-    constructor(ctx, url) {
-        this.ctx = ctx;
+    constructor(url) {
         this.url = url;
     }
 

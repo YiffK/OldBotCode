@@ -1,5 +1,4 @@
 require('dotenv').config();
-
 const { Telegraf } = require('telegraf');
 const bot = new Telegraf('1758358884:AAE5S8wSSclTWbFli14wiVttUHNofK9As2o');
 const { sequelize } = require('./models');
@@ -7,61 +6,27 @@ const { User } = require('./queries');
 const { Furaffinity, e621, Twitter } = require('./api');
 const moment = require('moment');
 const cronjob = require('node-cron');
+const express = require('express');
+const cookieParser = require('cookie-parser');
+const app = express();
+const port = 3000;
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
+
+app.post('/postLinks', async (req, res) => {
+    const { password = '', links = '' } = req.body;
+    if (password !== 'Esmiwalmart2015') return res.sendStatus(403);
+    const batch = Date.now();
+    bot.telegram.sendMessage(ownerChatId, `Working on batch ${batch}`);
+    bot.telegram.sendMessage(ownerChatId, `Bulk submit started from the web ${batch}`);
+    let arr = links.split('\n');
+    if (!arr) return res.sendStatus(500);
+    const results = await processUrls(arr, null, batch);
+    res.send(results);
+});
 // 5 minutes in miliseconds
 let time = 5 * 60 * 1000;
-
-const EventEmitter = require('events');
-const { transaction } = require('./queries/posts');
-const eventEmitter = new EventEmitter();
-
-eventEmitter.on('command', ({ user_internal_id, command }) => {
-    // sequelize.models.usage_log.create({
-    // })
-});
-
-function update_log(user_internal_id, command, success, commandArguments = null) {
-    sequelize.models.usage_log.create({
-        user_internal_id,
-        command,
-        arguments: commandArguments,
-        success,
-    });
-}
-
-async function extract(ctx, method, replyToUser = true) {
-    if (ctx.chat.type !== 'private') return null;
-    let user_id = -1;
-    try {
-        const { id } = ctx.update.message.from;
-        const user = await sequelize.models.usr_user.findOne({
-            where: {
-                user_id: id.toString(),
-            },
-        });
-        user_id = user?.user_id;
-        const [_, url] = ctx.update.message.text.split(' ');
-        if (!url) {
-            ctx.reply('Invalid url!');
-            update_log(user?.id ?? -1, method, false, null);
-            return null;
-        }
-        if (!url.match(/^https:\/\/www.furaffinity.net\/view/gm)) {
-            ctx.reply('We only have support for Furaffinity right now!');
-            update_log(user?.id ?? -1, method);
-            return null;
-        }
-
-        const imgPath = await Furaffinity.fetchImage(url);
-        if (!imgPath) throw new Error('Image not downloaded');
-        if (replyToUser) {
-            ctx.replyWithPhoto({ source: imgPath }, { caption: url });
-        }
-        return { imgPath, url };
-    } catch (error) {
-        console.log(error);
-        ctx.reply('There was an error while managing your request: ', error);
-    }
-}
 
 function getContext(url) {
     if (url.match(/furaffinity\.net\/view\/[0-9]*(.*)$/)) return Furaffinity;
@@ -148,25 +113,26 @@ bot.command(['bulksubmit', 'bulkSubmit'], async (ctx) => {
     }
 });
 
-function processUrls(arr, ctx, batch) {
+function processUrls(arr, ctx = null, batch) {
     return new Promise(async (resolve, reject) => {
         const results = [];
         for (url of arr) {
-            results.push(await workURL(url, ctx));
+            results.push(await workURL(url));
         }
 
         const success = results.filter((res) => res).length;
-        ctx.reply(`Batch ${batch} finished with ${success} successes and ${results.length - success} errors`);
-        resolve(true);
+        if (ctx) {
+            ctx.reply(`Batch ${batch} finished with ${success} successes and ${results.length - success} errors`);
+        }
+        resolve({ success, errors: results.length - success });
     });
 }
-
-async function workURL(url, ctx) {
+async function workURL(url) {
     try {
         const context = getContext(url);
         let worker;
         if (context) {
-            worker = new context(ctx, url);
+            worker = new context(url);
         } else {
             return false;
         }
@@ -203,71 +169,6 @@ async function workURL(url, ctx) {
 
 bot.command('submit', async (ctx) => {
     return ctx.reply('This command is deprecated. Please use /bulkSubmit instead');
-    try {
-        const { id: user_id } = await User.findOneByID(ctx.update.message.from.id);
-        const userPermissions = await User.findUserRole(user_id);
-    } catch (err) {
-        ctx.reply('Sorry, I am programmed to only reply to one person at the moment');
-        return null;
-    }
-
-    if (!userPermissions) {
-        ctx.reply('Only admins can post here!');
-        return null;
-    }
-
-    if (userPermissions.role_id !== 1) {
-        ctx.reply('Only admins can post here!');
-        return null;
-    }
-
-    let arr = ctx.update.message.text.split(' ');
-    arr.splice(0, 2);
-    const args = arr.join(' ');
-    const [_, url] = ctx.update.message.text.split(' ');
-    const context = getContext(url);
-    let worker;
-    if (context) {
-        worker = new context(ctx, url);
-    } else {
-        ctx.reply(
-            'Error in link!\nOnly accepting:\n\t1. Furaffinity Views\n\t2. Twitter Posts with 1 image! (Works, but will always post the first image)'
-        );
-        return null;
-    }
-
-    // Must send the entire URL and return an image URL
-    const { text: imgURL, success, postID, replacementURL, hasHTTPS, isGif = false } = await worker.extractImageURL();
-    if (!success) {
-        ctx.reply(imgURL || 'Error');
-        return null;
-    }
-    let currentTime;
-    {
-        const today = new Date();
-        currentTime = `${today.getFullYear()}-${
-            today.getMonth() + 1
-        }-${today.getDate()} ${today.getHours()}:${today.getMinutes()}:${today.getSeconds()}`;
-    }
-    console.log('\x1b[32m', `[${currentTime}]New submit with url ${imgURL} submitted.`);
-    const finalUrl = `${hasHTTPS ? imgURL : `https:${imgURL}`}`;
-    const accompanyingObj = {
-        caption: `${replacementURL ?? ctx.message.text.split(' ')[1]}\n[${postID}]\n${process.env.CHAT_AT}\n\n ${args ?? ''}`,
-    };
-    const finalObj = JSON.stringify({
-        isGif,
-        accompanyingObj,
-    });
-
-    sequelize.models.queue.create({
-        imgURL: finalUrl,
-        obj: finalObj,
-    });
-    ctx.reply(`Submitted to queue`);
-
-    // await ctx.telegram.sendPhoto(process.env.CHAT_AT, `${hasHTTPS ? imgURL : `https:${imgURL}`}`, {
-    //     caption: `${replacementURL ?? ctx.message.text.split(' ')[1]}\n[${postID}]\n${process.env.CHAT_AT}\n\n ${args ?? ''}`,
-    // })
 });
 
 const getNumberInQueueModel = () => sequelize.models.queue.count();
@@ -511,3 +412,4 @@ bot.start(async (ctx) => {
 
 cronjob.schedule(`*/${time / 60 / 1000} * * * *`, runCronJob);
 bot.launch();
+app.listen(port);
