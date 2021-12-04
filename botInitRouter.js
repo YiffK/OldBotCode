@@ -13,13 +13,17 @@ const port = 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
+let logging = false
+
 
 app.post('/postLinks', async (req, res) => {
     const { password = '', links = '' } = req.body;
     if (password !== 'Esmiwalmart2015') return res.sendStatus(403);
     const batch = Date.now();
-    bot.telegram.sendMessage(ownerChatId, `Working on batch ${batch}`);
-    bot.telegram.sendMessage(ownerChatId, `Bulk submit started from the web ${batch}`);
+    if (logging) {
+        bot.telegram.sendMessage(ownerChatId, `Working on batch ${batch}`);
+        bot.telegram.sendMessage(ownerChatId, `Bulk submit started from the web ${batch}`);
+    }
     let arr = links.split('\n');
     if (!arr) return res.sendStatus(500);
     const results = await processUrls(arr, null, batch);
@@ -34,6 +38,11 @@ function getContext(url) {
     else if (url.match(/twitter\.com\/(.*)\/status\/[0-9]*(.*)$/)) return Twitter;
     else return null;
 }
+bot.command('logging', (ctx) => {
+    logging = ! logging;
+
+    ctx.reply(`Logging set to ${logging}`);
+})
 
 bot.command(['settime', 'setTime'], async (ctx) => {
     let [_, newTime] = ctx.update.message.text.split(' ');
