@@ -3,6 +3,7 @@ const { Telegraf } = require('telegraf');
 const bot = new Telegraf('1758358884:AAE5S8wSSclTWbFli14wiVttUHNofK9As2o');
 const { sequelize } = require('./models');
 const { User } = require('./queries');
+const { Op } = require('sequelize');
 const { Furaffinity, e621, Twitter } = require('./api');
 const moment = require('moment');
 const cronjob = require('node-cron');
@@ -13,8 +14,7 @@ const port = 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
-let logging = false
-
+let logging = false;
 
 app.post('/postLinks', async (req, res) => {
     const { password = '', links = '' } = req.body;
@@ -39,10 +39,10 @@ function getContext(url) {
     else return null;
 }
 bot.command('logging', (ctx) => {
-    logging = ! logging;
+    logging = !logging;
 
     ctx.reply(`Logging set to ${logging}`);
-})
+});
 
 bot.command(['settime', 'setTime'], async (ctx) => {
     let [_, newTime] = ctx.update.message.text.split(' ');
@@ -418,6 +418,30 @@ bot.start(async (ctx) => {
     }
 });
 
+async function deleteOldPosts(ctx = null) {
+    const count = await sequelize.models.posts.count();
+    try {
+        await sequelize.models.posts.destroy({
+            where: {
+                created_at: {
+                    [Op.lte]: moment().subtract(2, 'months').format('YYYY-MM-DD HH:mm:ss'),
+                },
+            },
+        });
+        const newCount = await sequelize.models.posts.count();
+
+        return ctx?.reply(`Deleted ${count - newCount} posts. There are now ${newCount} posts.`);
+    } catch (error) {
+        console.log(error);
+    }
+}
+
+bot.command('delete', (ctx) => {
+    if (ctx.update.message.from.username !== 'Yagdrassyl') return;
+    deleteOldPosts(ctx);
+});
 cronjob.schedule(`*/${time / 60 / 1000} * * * *`, runCronJob);
+cronjob.schedule(`0 0 * * *`, deleteOldPosts);
+
 bot.launch();
 app.listen(port);
