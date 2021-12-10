@@ -421,6 +421,7 @@ bot.start(async (ctx) => {
 async function deleteOldPosts(ctx = null) {
     const count = await sequelize.models.posts.count();
     try {
+        console.log(`Deleting ${count} posts...`);
         await sequelize.models.posts.destroy({
             where: {
                 created_at: {
@@ -429,11 +430,13 @@ async function deleteOldPosts(ctx = null) {
             },
         });
         const newCount = await sequelize.models.posts.count();
+        console.log(`Deleted ${count - newCount} posts.`);
+        console.log(`${newCount} posts remaining.`);
 
         return ctx?.reply(`Deleted ${count - newCount} posts. There are now ${newCount} posts.`);
     } catch (error) {
         console.log(error);
-        ctx.reply(`Error: ${error}`);
+        ctx?.reply(`Error: ${error}`);
     }
 }
 
