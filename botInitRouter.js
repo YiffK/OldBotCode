@@ -424,7 +424,7 @@ async function deleteOldPosts(ctx = null) {
         await sequelize.models.posts.destroy({
             where: {
                 created_at: {
-                    [Op.lte]: moment().subtract(2, 'months').format('YYYY-MM-DD HH:mm:ss'),
+                    [Op.lte]: moment().subtract(20, 'days').format('YYYY-MM-DD HH:mm:ss'),
                 },
             },
         });
