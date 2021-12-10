@@ -433,6 +433,7 @@ async function deleteOldPosts(ctx = null) {
         return ctx?.reply(`Deleted ${count - newCount} posts. There are now ${newCount} posts.`);
     } catch (error) {
         console.log(error);
+        ctx.reply(`Error: ${error}`);
     }
 }
 
